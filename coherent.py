@@ -1,5 +1,5 @@
 from nlgeval import compute_metrics
-file_generate = "/local/ssd_1/chengzhang/SA_dialog/dialogue/result/nlpcc2017_tune_output/nlpcc2017_diverse_e0_output.txt"
+file_generate = "/local/ssd_1/chengzhang/SA_dialog/dialogue/result/nlpcc2017_tune_output/nlpcc2017_256_diverse_input.txt"
 file_truth = '/local/ssd_1/chengzhang/SA_dialog/big_data/nlpcc2017_reference.txt'
 generate = []
 truth = []
