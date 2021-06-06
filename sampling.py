@@ -30,8 +30,7 @@ def simulatedAnnealing_dialog(option):
             stc_emotion.append(line.strip()) 
     pointer = 0
     all_k_buffer_handler = [BufferHandler(os.path.join(option.this_expsdir, option.save_path))]
-    total_ppl = 0
-    #log = open('log.txt', 'w', encoding='utf-8')
+
     for sen_id in range(int(use_data.length/batch_size)):
         input, sequence_length, _ = use_data(batch_size, sen_id)
         sources = stc_source[pointer:pointer+batch_size]
@@ -45,12 +44,11 @@ def simulatedAnnealing_dialog(option):
 
         for k in range(option.N_repeat):
             sens, final_emo_probs = sa_dialog(input, sequence_length, sources, id2sen, option, batch_size, emotions)
-            #log.write('target emotion : ' + str(emotions[0]) + ' | ' + 'target emo prob : ' + str(final_emo_probs) + '\n')
             for i in range(batch_size):
                 sen = ' '.join(id2sen(sens[i]))
                 
                 all_k_buffer_handler[k].appendtext(sen.replace('<s>','').replace('</s>','').strip())
-    #log.close()
+
     # Close all k files
     for k in range(option.N_repeat):
         all_k_buffer_handler[k].close()
@@ -58,7 +56,7 @@ def simulatedAnnealing_dialog(option):
 def sa_dialog(input, sequence_length, sources, id2sen, option, batch_size, emotions):
     pos = 0
     original_text = getOriginalText(input, id2sen)
-    emotion_old = inference_emotion(original_text, emotions[0], batch_size)
+    emotion_old, = inference_emotion(original_text, emotions[0], batch_size)
     probs_old, _ = seq2seq_model(original_text, input, sources, sequence_length, id2sen)
     for iter in range(option.sample_time):
         temperature = option.temperatures[iter]
@@ -67,7 +65,6 @@ def sa_dialog(input, sequence_length, sources, id2sen, option, batch_size, emoti
 
         if action == 0: # word replacement (action: 0)
             
-            # cut the input, [<--fwd--| 'replaced word' |-----bck_reverse----->]
             input_forward, input_backward, sequence_length_forward, sequence_length_backward =\
                     cut_from_point(input, sequence_length, ind, option, mode=action)
             input_forward_text = getOriginalText(input_forward, id2sen)
@@ -80,6 +77,8 @@ def sa_dialog(input, sequence_length, sources, id2sen, option, batch_size, emoti
                 prob_forward = prob_forward[i, ind%(sequence_length[i]-1),:]
                 prob_backward = prob_backward[i, sequence_length[i]-1-ind%(sequence_length[i]-1)-1,:]
                 prob_mul = prob_forward * prob_backward
+                for i in range(len(prob_mul)):
+                    prob_mul[i].item() = 1
                 input_candidate, sequence_length_candidate = generate_candidate_input(input[i],\
                     sequence_length[i], ind, prob_mul, option.search_size, option, mode=action)
               
@@ -131,6 +130,8 @@ def sa_dialog(input, sequence_length, sources, id2sen, option, batch_size, emoti
                 prob_forward = prob_forward[i, ind%(sequence_length[i]-1),:]
                 prob_backward = prob_backward[i, sequence_length[i]-1-ind%(sequence_length[i]-1),:]
                 prob_mul = prob_forward * prob_backward
+                for i in range(len(prob_mul)):
+                    prob_mul[i] = 1
 
                 input_candidate, sequence_length_candidate = generate_candidate_input(input[i],\
                     sequence_length[i], ind, prob_mul, option.search_size, option, mode=action)
@@ -194,11 +195,6 @@ def sa_dialog(input, sequence_length, sources, id2sen, option, batch_size, emoti
         
     final_emo_probs = emotion_old[0].item()
     return input, final_emo_probs
-
-def ppl(input, length):
-    l =  (np.log2(input))/length
-    ppl = np.power(2, -l)
-    return ppl
 
 def computeScore(prob_candidate, prob_old, temperature):
     V_new = math.log(max(prob_candidate, 1e-200))
